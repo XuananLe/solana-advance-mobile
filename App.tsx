@@ -1,20 +1,25 @@
-import { StatusBar } from 'expo-status-bar';
-import { StyleSheet, Text, View } from 'react-native';
+import { ConnectionProvider } from "./components/ConnectionProvider";
+import { AuthorizationProvider } from "./components/AuthProvider";
+import { clusterApiUrl } from "@solana/web3.js";
+import { MainScreen } from "./screens/MainScreen"
+import "./polyfills"
+import { NFTProvider } from "./components/NFTProvider";
 
 export default function App() {
+  const cluster = "devnet";
+  const endpoint = clusterApiUrl(cluster);
+
   return (
-    <View style={styles.container}>
-      <Text>Open up App.tsx to start working on your app!</Text>
-      <StatusBar style="auto" />
-    </View>
+    <ConnectionProvider
+      endpoint={endpoint}
+      cluster={cluster}
+      config={{ commitment: "processed" }}
+    >
+      <AuthorizationProvider cluster={cluster}>
+        <NFTProvider>
+          <MainScreen />
+        </NFTProvider>
+      </AuthorizationProvider>
+    </ConnectionProvider>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#fff',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-});
