@@ -161,8 +161,8 @@ export function MainScreen() {
     };
 
     fetchNftOfTheDayMetadata();
-  }, [nftOfTheDay, todaysDate]); const mintNFT = async () => {
-
+  }, [nftOfTheDay, todaysDate]); 
+  const mintNFT = async () => {
     const result = await ImagePicker.launchCameraAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: true,

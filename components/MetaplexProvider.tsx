@@ -1,5 +1,4 @@
 import { createUmi } from '@metaplex-foundation/umi-bundle-defaults';
-import { mplCandyMachine } from '@metaplex-foundation/mpl-candy-machine';
 import { mplTokenMetadata } from '@metaplex-foundation/mpl-token-metadata';
 import { walletAdapterIdentity } from '@metaplex-foundation/umi-signer-wallet-adapters';
 import { transact, Web3MobileWallet } from "@solana-mobile/mobile-wallet-adapter-protocol-web3js";
@@ -50,9 +49,8 @@ export const useUmi = (
         });
       },
     };
-
+    // Add Umi Plugins
     const umi = createUmi(connection.rpcEndpoint)
-      .use(mplCandyMachine())
       .use(mplTokenMetadata())
       .use(walletAdapterIdentity(mobileWalletAdapter));
 
