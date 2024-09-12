@@ -1,16 +1,16 @@
 import "react-native-url-polyfill/auto";
+import React, { ReactNode, createContext, useContext, useState, useCallback, useMemo } from "react";
 import { useConnection } from "./ConnectionProvider";
 import { Account, useAuthorization } from "./AuthProvider";
-import React, { ReactNode, createContext, useContext, useState } from "react";
 import { useUmi } from "./MetaplexProvider";
 import { publicKey, Umi, PublicKey, generateSigner, percentAmount } from "@metaplex-foundation/umi";
 import { createUmi } from "@metaplex-foundation/umi-bundle-defaults";
 import { clusterApiUrl } from "@solana/web3.js";
 import { transact } from "@solana-mobile/mobile-wallet-adapter-protocol";
-import "dotenv/config";
+import * as web3 from "@solana/web3.js";
 import RNFetchBlob from "rn-fetch-blob";
+import { fromWeb3JsPublicKey } from '@metaplex-foundation/umi-web3js-adapters';
 import { createNft, DigitalAsset, fetchAllDigitalAssetByCreator, fetchDigitalAsset } from "@metaplex-foundation/mpl-token-metadata";
-import { getExplorerLink } from "@solana-developers/helpers";
 import { PinataSDK } from "pinata-web3";
 
 export interface NFTProviderProps {
@@ -36,7 +36,7 @@ const DEFAULT_NFT_CONTEXT_STATE: NFTContextState = {
   nftOfTheDay: null,
   connect: () => publicKey("00000000000000000000000000000000"), // Default PublicKey
   fetchNFTs: () => { },
-  createNFT: (name: string, description: string, fileUri: string) => { },
+  createNFT: () => { },
 };
 
 export function formatDate(date: Date) {
@@ -46,13 +46,12 @@ export function formatDate(date: Date) {
 const NFTContext = createContext<NFTContextState>(DEFAULT_NFT_CONTEXT_STATE);
 
 export function NFTProvider(props: NFTProviderProps) {
-  const pinata = new PinataSDK({
+  const pinata = useMemo(() => new PinataSDK({
     pinataJwt: process.env.EXPO_PUBLIC_PINATA_JWT,
-    pinataGateway: process.env.EXPO_PUBLIC_PINATA_GATEWAY
-  });
+    pinataGateway: process.env.EXPO_PUBLIC_PINATA_GATEWAY,
+  }), []);
 
-  const { children } = props;
-
+  const ipfsPrefix = `https://${process.env.EXPO_PUBLIC_NFT_PINATA_GATEWAY_URL}/ipfs/`;
   const { connection } = useConnection();
   const { authorizeSession } = useAuthorization();
   const [account, setAccount] = useState<Account | null>(null);
@@ -60,130 +59,86 @@ export function NFTProvider(props: NFTProviderProps) {
   const [loadedNFTs, setLoadedNFTs] = useState<DigitalAsset[] | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const { umi } = useUmi(connection, account, authorizeSession);
+  const { children } = props;
 
-  const connect = () => {
+ const connect = useCallback(() => {
     if (isLoading) return;
 
     setIsLoading(true);
-    transact(async wallet => {
+    transact(async (wallet) => {
       const auth = await authorizeSession(wallet);
       setAccount(auth);
     }).finally(() => {
       setIsLoading(false);
     });
-  };
+  }, [isLoading, authorizeSession]);
 
-  const fetchNFTs = async () => {
+
+  const fetchNFTs = useCallback(async () => {
     if (!umi || !account || isLoading) return;
     setIsLoading(true);
+
     try {
-      const nfts = await fetchAllDigitalAssetByCreator(umi, publicKey(account.publicKey))
-
-      const loadedNFTs = await Promise.all(
-        nfts.map(async (nft) => {
-          // If you need to load the metadata separately, fetch it here.
-          // For now, we assume nft.metadata is already available.
-          const metadata = nft.metadata || {}; // Handle cases where metadata might not be available.
-          return { nft, metadata };
-        })
-      );
-
-      setLoadedNFTs(loadedNFTs.map((loadedNft) => loadedNft.nft));
+      const creatorPublicKey = fromWeb3JsPublicKey(account.publicKey);
+      const nfts = await fetchAllDigitalAssetByCreator(umi, creatorPublicKey);
+      setLoadedNFTs(nfts);
     } catch (error) {
-
+      console.error("Failed to fetch NFTs:", error);
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }
-
-  const uploadImage = async (fileUri: string): Promise<string> => {
-    const imageBytesInBase64: string = await RNFetchBlob.fs.readFile(
-      fileUri,
-      "base64",
-    );
-
-    // pinata.upload.base64 is used to send the Base64-encoded image to Pinata Cloud
-    // This is based on Pinata's Base64 upload API: https://docs.pinata.cloud/web3/sdk/upload/base64#base64
+  }, [umi, account, isLoading]);
+  const uploadImage = useCallback(async (fileUri: string): Promise<string> => {
+    const imageBytesInBase64 = await RNFetchBlob.fs.readFile(fileUri, "base64");
     const upload = await pinata.upload.base64(imageBytesInBase64);
-
-    // Return the IPFS hash of the uploaded image (IPFS is a decentralized file storage system)
     return upload.IpfsHash;
-  };
+  }, [pinata]);
 
-  const uploadMetadata = async (
+
+  const uploadMetadata = useCallback(async (
     name: string,
     description: string,
     imageCID: string,
   ): Promise<string> => {
-    // pinata.upload.json is used to send the JSON to Pinata Cloud
-    // This is based on Pinata's Base64 upload API: https://docs.pinata.cloud/web3/sdk/upload/json
-    const upload = await pinata.upload.json({
-      name: name,
-      description: description,
-      imageCID: imageCID
-    })
-    return upload.IpfsHash
-  }
+    const upload = await pinata.upload.json({ name, description, imageCID });
+    return upload.IpfsHash;
+  }, [pinata]);
 
-  const createNFT = async (
+
+  const createNFT = useCallback(async (
     name: string,
     description: string,
     fileUri: string,
   ) => {
-    if (!umi || !account || !isLoading) return;
-
+    if (!umi || !account || isLoading) return;
     setIsLoading(true);
-
-    const uploadImage = async (fileUri: string): Promise<string> => {
-      const imageBytesInBase64: string = await RNFetchBlob.fs.readFile(
-        fileUri,
-        "base64",
-      );
-      const bytes = Buffer.from(imageBytesInBase64, "base64");
-
-      const response = await fetch("https://api.nft.storage/upload", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${process.env.EXPO_PUBLIC_NFT_STORAGE_API}`,
-          "Content-Type": "image/jpg",
-        },
-        body: bytes,
-      });
-
-      const data = await response.json();
-      const cid = data.value.cid;
-
-      return cid as string;
-    };
-
     try {
+      console.log(`Creating NFT...`);
+      const imageCID = await uploadImage(fileUri);
+      const metadataCID = await uploadMetadata(name, description, imageCID);
       const mint = generateSigner(umi);
       const transaction = createNft(umi, {
         mint,
-        name: name,
-        uri: fileUri,
+        name,
+        uri: ipfsPrefix + metadataCID,
         sellerFeeBasisPoints: percentAmount(0),
       });
       await transaction.sendAndConfirm(umi);
       const createdNft = await fetchDigitalAsset(umi, mint.publicKey);
-
-      console.log(
-        `✨🖼️ Created NFT! Address is: ${getExplorerLink(
-          "address",
-          createdNft.mint.publicKey,
-          "devnet"
-        )}`
-      );
-      console.log("✅ Finished successfully!");
+      setNftOfTheDay(createdNft);
     } catch (error) {
-      console.log(error)
+      console.error("Failed to create NFT:", error);
     } finally {
       setIsLoading(false);
     }
-  };
-  const state = {
+  }, [umi, account, isLoading, uploadImage, uploadMetadata]);
+
+  const publicKey = useMemo(() =>
+    account?.publicKey ? fromWeb3JsPublicKey(account.publicKey as web3.PublicKey) : null,
+    [account]);
+
+  const state: NFTContextState = {
     isLoading,
-    account,
     publicKey,
     umi,
     nftOfTheDay,
