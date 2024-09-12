@@ -5,8 +5,9 @@ import { transact, Web3MobileWallet } from "@solana-mobile/mobile-wallet-adapter
 import { Connection, Transaction, VersionedTransaction } from "@solana/web3.js";
 import { useMemo } from "react";
 import { Account } from "./AuthProvider";
+import { mplTokenMetadata } from '@metaplex-foundation/mpl-token-metadata';
 
-type Web3JsTransactionOrVersionedTransaction = Transaction | VersionedTransaction;
+type LegacyOrVersionedTransact = Transaction | VersionedTransaction;
 
 export const useUmi = (
   connection: Connection,
@@ -15,7 +16,7 @@ export const useUmi = (
 ) => {
   return useMemo(() => {
     if (!selectedAccount || !authorizeSession) {
-      return { umi: null };
+      return { mobileWalletAdapter: null, umi: null };
     }
 
     const mobileWalletAdapter = {
@@ -30,7 +31,7 @@ export const useUmi = (
           return signedMessages[0];
         });
       },
-      signTransaction: async <T extends Web3JsTransactionOrVersionedTransaction>(transaction: T): Promise<T> => {
+      signTransaction: async <T extends LegacyOrVersionedTransact>(transaction: T): Promise<T> => {
         return await transact(async (wallet: Web3MobileWallet) => {
           await authorizeSession(wallet);
           const signedTransactions = await wallet.signTransactions({
@@ -39,7 +40,7 @@ export const useUmi = (
           return signedTransactions[0] as T;
         });
       },
-      signAllTransactions: async <T extends Web3JsTransactionOrVersionedTransaction>(transactions: T[]): Promise<T[]> => {
+      signAllTransactions: async <T extends LegacyOrVersionedTransact>(transactions: T[]): Promise<T[]> => {
         return transact(async (wallet: Web3MobileWallet) => {
           await authorizeSession(wallet);
           const signedTransactions = await wallet.signTransactions({
@@ -52,6 +53,7 @@ export const useUmi = (
 
     const umi = createUmi(connection.rpcEndpoint)
       .use(mplCandyMachine())
+      .use(mplTokenMetadata())
       .use(walletAdapterIdentity(mobileWalletAdapter));
 
     return { umi };
