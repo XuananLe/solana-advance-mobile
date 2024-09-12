@@ -3,7 +3,7 @@ import { AuthorizationProvider } from "./components/AuthProvider";
 import { clusterApiUrl } from "@solana/web3.js";
 import { MainScreen } from "./screens/MainScreen"
 import "./polyfills"
-import { NFTProvider } from "./components/NFTProvider";
+// import { NFTProvider } from "./components/NFTProvider";
 
 export default function App() {
   const cluster = "devnet";
@@ -16,9 +16,9 @@ export default function App() {
       config={{ commitment: "processed" }}
     >
       <AuthorizationProvider cluster={cluster}>
-        <NFTProvider>
+        {/* <NFTProvider> */}
           <MainScreen />
-        </NFTProvider>
+        {/* </NFTProvider> */}
       </AuthorizationProvider>
     </ConnectionProvider>
   );

@@ -1,11 +1,11 @@
 import { createUmi } from '@metaplex-foundation/umi-bundle-defaults';
 import { mplCandyMachine } from '@metaplex-foundation/mpl-candy-machine';
+import { mplTokenMetadata } from '@metaplex-foundation/mpl-token-metadata';
 import { walletAdapterIdentity } from '@metaplex-foundation/umi-signer-wallet-adapters';
 import { transact, Web3MobileWallet } from "@solana-mobile/mobile-wallet-adapter-protocol-web3js";
 import { Connection, Transaction, VersionedTransaction } from "@solana/web3.js";
 import { useMemo } from "react";
 import { Account } from "./AuthProvider";
-import { mplTokenMetadata } from '@metaplex-foundation/mpl-token-metadata';
 
 type LegacyOrVersionedTransact = Transaction | VersionedTransaction;
 
