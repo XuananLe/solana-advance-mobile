@@ -1,14 +1,14 @@
+import * as ImagePicker from "expo-image-picker";
+import React, { useEffect } from "react";
 import {
-  View,
   Button,
   Image,
-  StyleSheet,
   ScrollView,
+  StyleSheet,
   Text,
+  View,
 } from "react-native";
-import React, { useEffect } from "react";
 import { formatDate, useNFT } from "../components/NFTProvider";
-import * as ImagePicker from "expo-image-picker";
 
 const styles = StyleSheet.create({
   container: {
@@ -161,7 +161,7 @@ export function MainScreen() {
     };
 
     fetchNftOfTheDayMetadata();
-  }, [nftOfTheDay, todaysDate]); 
+  }, [nftOfTheDay, todaysDate]);
   const mintNFT = async () => {
     const result = await ImagePicker.launchCameraAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
@@ -183,10 +183,9 @@ export function MainScreen() {
       );
     }
   };
-
   const handleNFTButton = async () => {
     if (!publicKey) {
-      connect();
+      await connect();
     } else if (loadedNFTs === null) {
       fetchNFTs();
     } else if (!nftOfTheDay) {

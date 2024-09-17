@@ -1,5 +1,5 @@
-import {Cluster, Connection, ConnectionConfig, clusterApiUrl} from '@solana/web3.js';
-import React, {ReactNode, createContext, useContext, useMemo} from 'react';
+import { Cluster, Connection, ConnectionConfig, clusterApiUrl } from '@solana/web3.js';
+import React, { ReactNode, createContext, useContext, useMemo } from 'react';
 
 export interface ConnectionProviderProps {
   children: ReactNode;

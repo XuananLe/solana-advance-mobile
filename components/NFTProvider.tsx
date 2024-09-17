@@ -1,17 +1,16 @@
 import "react-native-url-polyfill/auto";
-import React, { ReactNode, createContext, useContext, useState, useCallback, useMemo } from "react";
-import { useConnection } from "./ConnectionProvider";
-import { Account, useAuthorization } from "./AuthProvider";
-import { useUmi } from "./MetaplexProvider";
-import { publicKey, Umi, PublicKey, generateSigner, percentAmount } from "@metaplex-foundation/umi";
+import { DigitalAsset, createNft, fetchAllDigitalAssetByCreator, fetchDigitalAsset } from "@metaplex-foundation/mpl-token-metadata";
+import { PublicKey, Umi, generateSigner, percentAmount, publicKey } from "@metaplex-foundation/umi";
 import { createUmi } from "@metaplex-foundation/umi-bundle-defaults";
-import { clusterApiUrl } from "@solana/web3.js";
-import { transact } from "@solana-mobile/mobile-wallet-adapter-protocol";
-import * as web3 from "@solana/web3.js";
-import RNFetchBlob from "rn-fetch-blob";
 import { fromWeb3JsPublicKey } from '@metaplex-foundation/umi-web3js-adapters';
-import { createNft, DigitalAsset, fetchAllDigitalAssetByCreator, fetchDigitalAsset } from "@metaplex-foundation/mpl-token-metadata";
+import { clusterApiUrl, PublicKey as solanaPublicKey } from "@solana/web3.js";
 import { PinataSDK } from "pinata-web3";
+import React, { ReactNode, createContext, useCallback, useContext, useMemo, useState } from "react";
+import RNFetchBlob from "rn-fetch-blob";
+import { Account, useAuthorization } from "../utils/useAuthorization";
+import { useConnection } from "./ConnectionProvider";
+import { useUmi } from "./MetaplexProvider";
+import { useMobileWallet } from "../utils/useMobileWallet";
 
 export interface NFTProviderProps {
   children: ReactNode;
@@ -28,32 +27,22 @@ export interface NFTContextState {
   createNFT: (name: string, description: string, fileUri: string) => void; // Creates the NFT
 }
 
-const DEFAULT_NFT_CONTEXT_STATE: NFTContextState = {
-  umi: createUmi(clusterApiUrl("devnet")),
-  publicKey: null,
-  isLoading: false,
-  loadedNFTs: null,
-  nftOfTheDay: null,
-  connect: () => publicKey("00000000000000000000000000000000"), // Default PublicKey
-  fetchNFTs: () => { },
-  createNFT: () => { },
-};
+
 
 export function formatDate(date: Date) {
   return `${date.getDate()}.${date.getMonth()}.${date.getFullYear()}`;
 }
 
-const NFTContext = createContext<NFTContextState>(DEFAULT_NFT_CONTEXT_STATE);
+const NFTContext = createContext<NFTContextState | null>(null);
 
 export function NFTProvider(props: NFTProviderProps) {
+  const ipfsPrefix = `https://${process.env.EXPO_PUBLIC_NFT_PINATA_GATEWAY_URL}/ipfs/`;
   const pinata = useMemo(() => new PinataSDK({
     pinataJwt: process.env.EXPO_PUBLIC_PINATA_JWT,
     pinataGateway: process.env.EXPO_PUBLIC_PINATA_GATEWAY,
   }), []);
-
-  const ipfsPrefix = `https://${process.env.EXPO_PUBLIC_NFT_PINATA_GATEWAY_URL}/ipfs/`;
   const { connection } = useConnection();
-  const { authorizeSession } = useAuthorization();
+  const { authorizeSessionWithSignIn, authorizeSession, deauthorizeSession } = useAuthorization();
   const [account, setAccount] = useState<Account | null>(null);
   const [nftOfTheDay, setNftOfTheDay] = useState<DigitalAsset | null>(null);
   const [loadedNFTs, setLoadedNFTs] = useState<DigitalAsset[] | null>(null);
@@ -61,18 +50,7 @@ export function NFTProvider(props: NFTProviderProps) {
   const { umi } = useUmi(connection, account, authorizeSession);
   const { children } = props;
 
- const connect = useCallback(() => {
-    if (isLoading) return;
-
-    setIsLoading(true);
-    transact(async (wallet) => {
-      const auth = await authorizeSession(wallet);
-      setAccount(auth);
-    }).finally(() => {
-      setIsLoading(false);
-    });
-  }, [isLoading, authorizeSession]);
-
+  const {connect} = useMobileWallet();
 
   const fetchNFTs = useCallback(async () => {
     if (!umi || !account || isLoading) return;
@@ -134,7 +112,7 @@ export function NFTProvider(props: NFTProviderProps) {
   }, [umi, account, isLoading, uploadImage, uploadMetadata]);
 
   const publicKey = useMemo(() =>
-    account?.publicKey ? fromWeb3JsPublicKey(account.publicKey as web3.PublicKey) : null,
+    account?.publicKey ? fromWeb3JsPublicKey(account.publicKey as solanaPublicKey) : null,
     [account]);
 
   const state: NFTContextState = {
@@ -152,4 +130,3 @@ export function NFTProvider(props: NFTProviderProps) {
 }
 
 export const useNFT = (): NFTContextState => useContext(NFTContext);
-

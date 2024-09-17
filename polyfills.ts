@@ -2,22 +2,25 @@ import "react-native-url-polyfill/auto";
 import { getRandomValues as expoCryptoGetRandomValues } from "expo-crypto";
 import { Buffer } from "buffer";
 
+// Set global Buffer
 global.Buffer = Buffer;
 
-// getRandomValues polyfill
+// Define Crypto class with getRandomValues method
 class Crypto {
   getRandomValues = expoCryptoGetRandomValues;
 }
 
-const webCrypto = typeof crypto !== "undefined" ? crypto : new Crypto();
+// Check if crypto is already defined in the global scope
+const hasInbuiltWebCrypto = typeof window.crypto !== "undefined";
 
-(() => {
-  if (typeof crypto === "undefined") {
-    Object.defineProperty(window, "crypto", {
-      configurable: true,
-      enumerable: true,
-      get: () => webCrypto,
-      
-    });
-  }
-})();
+// Use existing crypto if available, otherwise create a new Crypto instance
+const webCrypto = hasInbuiltWebCrypto ? window.crypto : new Crypto();
+
+// Polyfill crypto object if it's not already defined
+if (!hasInbuiltWebCrypto) {
+  Object.defineProperty(window, "crypto", {
+    configurable: true,
+    enumerable: true,
+    get: () => webCrypto,
+  });
+}

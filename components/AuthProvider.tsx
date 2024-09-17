@@ -11,58 +11,8 @@ import {
 import { toUint8Array } from 'js-base64';
 import { useState, useCallback, useMemo, ReactNode } from 'react';
 import React from 'react';
+import { APP_IDENTITY, Account } from '../utils/useAuthorization';
 
-export const AppIdentity = {
-    name: 'Mint-A-Day',
-};
-
-export const AuthUtils = {
-    getAuthorizationFromAuthResult: (
-        authResult: AuthorizationResult,
-        previousAccount?: Account,
-    ): Authorization => {
-        let selectedAccount: Account;
-        if (
-            //no wallet selected yet
-            previousAccount == null ||
-            //the selected wallet is no longer authorized
-            !authResult.accounts.some(
-                ({ address }) => address === previousAccount.address,
-            )
-        ) {
-            const firstAccount = authResult.accounts[0];
-            selectedAccount = AuthUtils.getAccountFromAuthorizedAccount(firstAccount);
-        } else {
-            selectedAccount = previousAccount;
-        }
-        return {
-            accounts: authResult.accounts.map(
-                AuthUtils.getAccountFromAuthorizedAccount,
-            ),
-            authToken: authResult.auth_token,
-            selectedAccount,
-        };
-    },
-
-    getAccountFromAuthorizedAccount: (
-        authAccount: AuthorizedAccount,
-    ): Account => {
-        return {
-            ...authAccount,
-            publicKey: AuthUtils.getPublicKeyFromAddress(authAccount.address),
-        };
-    },
-
-    getPublicKeyFromAddress: (address: Base64EncodedAddress) => {
-        return new PublicKey(toUint8Array(address));
-    },
-};
-
-export type Account = Readonly<{
-    address: Base64EncodedAddress;
-    label?: string;
-    publicKey: PublicKey;
-}>;
 
 type Authorization = Readonly<{
     accounts: Account[];
@@ -97,20 +47,51 @@ export type AuthProviderProps = {
     cluster: Cluster;
 };
 
+function getPublicKeyFromAddress(address: Base64EncodedAddress): PublicKey {
+    return new PublicKey(toUint8Array(address));
+}
+
+function getAccountFromAuthorizedAccount(authAccount: AuthorizedAccount): Account {
+    return {
+        ...authAccount,
+        publicKey: getPublicKeyFromAddress(authAccount.address),
+    };
+}
+
+function getAuthorizationFromAuthResult(
+    authResult: AuthorizationResult,
+    previousAccount?: Account,
+): Authorization {
+    let selectedAccount: Account;
+    if (
+        previousAccount == null ||
+        !authResult.accounts.some(
+            ({ address }) => address === previousAccount.address,
+        )
+    ) {
+        const firstAccount = authResult.accounts[0];
+        selectedAccount = getAccountFromAuthorizedAccount(firstAccount);
+    } else {
+        selectedAccount = previousAccount;
+    }
+    return {
+        accounts: authResult.accounts.map(getAccountFromAuthorizedAccount),
+        authToken: authResult.auth_token,
+        selectedAccount,
+    };
+}
+
 export function AuthorizationProvider(props: AuthProviderProps) {
-    const { children, cluster } = { ...props };
-    const [authorization, setAuthorization] = useState<Authorization | null>(
-        null,
-    );
+    const { children, cluster } = props;
+    const [authorization, setAuthorization] = useState<Authorization | null>(null);
 
     const handleAuthorizationResult = useCallback(
         async (authResult: AuthorizationResult): Promise<Authorization> => {
-            const nextAuthorization = AuthUtils.getAuthorizationFromAuthResult(
+            const nextAuthorization = getAuthorizationFromAuthResult(
                 authResult,
                 authorization?.selectedAccount,
             );
             setAuthorization(nextAuthorization);
-
             return nextAuthorization;
         },
         [authorization, setAuthorization],
@@ -121,9 +102,9 @@ export function AuthorizationProvider(props: AuthProviderProps) {
             const authorizationResult = await (authorization
                 ? wallet.reauthorize({
                     auth_token: authorization.authToken,
-                    identity: AppIdentity,
+                    identity: APP_IDENTITY,
                 })
-                : wallet.authorize({ identity: AppIdentity }));
+                : wallet.authorize({ identity: APP_IDENTITY }));
             return (await handleAuthorizationResult(authorizationResult))
                 .selectedAccount;
         },
@@ -135,7 +116,6 @@ export function AuthorizationProvider(props: AuthProviderProps) {
             if (authorization?.authToken == null) {
                 return;
             }
-
             await wallet.deauthorize({ auth_token: authorization.authToken });
             setAuthorization(null);
         },
@@ -146,14 +126,12 @@ export function AuthorizationProvider(props: AuthProviderProps) {
         (nextAccount: Account) => {
             setAuthorization(currentAuthorization => {
                 if (
-                    //check if the account is no longer authorized
                     !currentAuthorization?.accounts.some(
                         ({ address }) => address === nextAccount.address,
                     )
                 ) {
                     throw new Error(`${nextAccount.address} is no longer authorized`);
                 }
-
                 return { ...currentAuthorization, selectedAccount: nextAccount };
             });
         },
@@ -178,4 +156,3 @@ export function AuthorizationProvider(props: AuthProviderProps) {
     );
 }
 
-export const useAuthorization = () => React.useContext(AuthorizationContext);
