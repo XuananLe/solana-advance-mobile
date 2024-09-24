@@ -1,5 +1,5 @@
 import { transact } from "@solana-mobile/mobile-wallet-adapter-protocol-web3js";
-import { Account, useAuthorization } from "../utils/useAuthorization";
+import { Account, useAuthorization } from "./useAuthorization";
 import {
   Transaction,
   TransactionSignature,
@@ -9,19 +9,13 @@ import { useCallback, useMemo } from "react";
 import { SignInPayload } from "@solana-mobile/mobile-wallet-adapter-protocol";
 
 export function useMobileWallet() {
-  
   const { authorizeSessionWithSignIn, authorizeSession, deauthorizeSession } =
     useAuthorization();
 
   const connect = useCallback(async (): Promise<Account> => {
-    try {
-      return await transact(async (wallet) => {
-        return await authorizeSession(wallet);
-      });        
-    } catch (error) {
-      console.error('Failed to connect:', error);
-      throw new Error('Connection failed. Please try again.');
-    }
+    return await transact(async (wallet) => {
+      return await authorizeSession(wallet);
+    });
   }, [authorizeSession]);
 
   const signIn = useCallback(

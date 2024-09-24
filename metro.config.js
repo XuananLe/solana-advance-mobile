@@ -1,5 +1,5 @@
-// Import the default Expo Metro config
-const { getDefaultConfig } = require("@expo/metro-config");
+// Learn more https://docs.expo.io/guides/customizing-metro
+const { getDefaultConfig } = require('expo/metro-config');
 
 // Get the default Expo Metro configuration
 const defaultConfig = getDefaultConfig(__dirname);
@@ -15,7 +15,7 @@ defaultConfig.resolver.extraNodeModules = {
 };
 
 // Export the modified configuration
-module.exports = {
+module.exports =  {
   ...defaultConfig,
   resolver: {
     ...defaultConfig.resolver,

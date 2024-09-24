@@ -1,43 +1,44 @@
-import { Cluster, Connection, ConnectionConfig, clusterApiUrl } from '@solana/web3.js';
-import React, { ReactNode, createContext, useContext, useMemo } from 'react';
+import { Connection, type ConnectionConfig } from "@solana/web3.js";
+import React, {
+  type FC,
+  type ReactNode,
+  useMemo,
+  createContext,
+  useContext,
+} from "react";
+import { useCluster } from "./ClusterProvider";
 
 export interface ConnectionProviderProps {
   children: ReactNode;
-  cluster: Cluster;
-  endpoint?: string;
   config?: ConnectionConfig;
 }
 
-export interface ConnectionContextState {
-  connection: Connection;
-  cluster: Cluster;
-}
-
-const ConnectionContext = createContext<ConnectionContextState>(
-  {} as ConnectionContextState,
-);
-
-export function ConnectionProvider(props: ConnectionProviderProps){
-  const {children, cluster, endpoint, config = {commitment: 'confirmed'}} = props;
-
-  const rpcUrl = endpoint ?? clusterApiUrl(cluster);
+export const ConnectionProvider: FC<ConnectionProviderProps> = ({
+  children,
+  config = { commitment: "confirmed" },
+}) => {
+  const { selectedCluster } = useCluster();
 
   const connection = useMemo(
-    () => new Connection(rpcUrl, config),
-    [config, rpcUrl],
+    () => new Connection(selectedCluster.endpoint, config),
+    [selectedCluster, config]
   );
 
-  const value = {
-    connection,
-    cluster,
-  };
-
   return (
-    <ConnectionContext.Provider value={value}>
+    <ConnectionContext.Provider value={{ connection }}>
       {children}
     </ConnectionContext.Provider>
   );
 };
 
-export const useConnection = (): ConnectionContextState =>
-  useContext(ConnectionContext);
+export interface ConnectionContextState {
+  connection: Connection;
+}
+
+export const ConnectionContext = createContext<ConnectionContextState>(
+  {} as ConnectionContextState
+);
+
+export function useConnection(): ConnectionContextState {
+  return useContext(ConnectionContext);
+}

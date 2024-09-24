@@ -23,4 +23,4 @@ if (!hasInbuiltWebCrypto) {
     enumerable: true,
     get: () => webCrypto,
   });
-}
+}                                                           
