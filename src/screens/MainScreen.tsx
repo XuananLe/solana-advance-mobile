@@ -9,6 +9,7 @@ import {
   import React, { useEffect } from "react";
   import * as ImagePicker from "expo-image-picker";
 import { formatDate, useNFT } from "../components/NftProvider";
+import { useMobileWallet } from "../utils/useMobileWallet";
   
   const styles = StyleSheet.create({
     container: {
@@ -67,7 +68,6 @@ import { formatDate, useNFT } from "../components/NftProvider";
   export function MainScreen() {
     const {
       fetchNFTs,
-      connect,
       publicKey,
       isLoading,
       createNFT,
@@ -79,12 +79,13 @@ import { formatDate, useNFT } from "../components/NftProvider";
     const [previousImages, setPreviousImages] =
       React.useState<NFTSnapshot[]>(DEFAULT_IMAGES);
     const todaysDate = new Date(Date.now());
-    const ipfsPrefix = `https://${process.env.EXPO_PUBLIC_NFT_PINATA_GATEWAY_URL}/ipfs/`;
+    const ipfsPrefix = `https://plum-changing-egret-361.mypinata.cloud/ipfs/`;
     type NftMetaResponse = {
       name: string;
       description: string;
       imageCID: string;
     };
+    const {connect} = useMobileWallet();
     const fetchMetadata = async (uri: string) => {
       try {
         const response = await fetch(uri);
@@ -187,7 +188,7 @@ import { formatDate, useNFT } from "../components/NftProvider";
   
     const handleNFTButton = async () => {
       if (!publicKey) {
-        connect();
+        await connect();
       } else if (loadedNFTs === null) {
         fetchNFTs();
       } else if (!nftOfTheDay) {

@@ -1,6 +1,6 @@
 # A demonstration to show how to develop Dapps with Expo
 
-A demonstration showcasing the development of Solana DApps using Expo. We worked on a project called "Mint-A-Day," which enables users to connect their wallet, retrieve NFTs they've created, and mint new NFTs themselves.
+A demonstration showcasing the development of Solana DApps using Expo. We worked on a project called "Mint-A-Day," which allows users to connect their wallet, view their minted NFTs, and create new ones.
 
 ## Prerequisites
 
@@ -34,6 +34,14 @@ A demonstration showcasing the development of Solana DApps using Expo. We worked
 
    ```bash
    yarn run start
+   ```
+
+5. In case you encounter this error ```Unable to resolve "@metaplex-foundation/umi/serializers" from "node_modules/@metaplex-foundation/mpl-bubblegum/dist/src/hash.js"```. You can refer to this [Umi issue](https://github.com/metaplex-foundation/umi/issues/94) for more details. To resolve the issue, run the following command
+
+   ```bash
+      cd metaplex-fixer
+      yarn
+      node fixer.mjs
    ```
 
 ## Project Structure

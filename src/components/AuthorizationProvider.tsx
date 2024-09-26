@@ -104,7 +104,7 @@ function AuthorizationProvider(props: {children: ReactNode}) {
         authorizationResult,
         authorization?.selectedAccount,
       );
-      await setAuthorization(nextAuthorization);
+      setAuthorization(nextAuthorization);
       return nextAuthorization;
     },
     [authorization, setAuthorization],

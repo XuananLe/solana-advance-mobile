@@ -3,12 +3,11 @@ import { DigitalAsset, createNft, fetchAllDigitalAssetByCreator, fetchDigitalAss
 import { PublicKey, Umi, generateSigner, percentAmount } from "@metaplex-foundation/umi";
 import { fromWeb3JsPublicKey } from '@metaplex-foundation/umi-web3js-adapters';
 import { clusterApiUrl, PublicKey as solanaPublicKey } from "@solana/web3.js";
-import React, { ReactNode, createContext, useCallback, useContext, useMemo, useState } from "react";
-import RNFetchBlob from "rn-fetch-blob";
-import { useConnection } from "./ConnectionProvider";
+import React, { ReactNode, createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { useUmi } from "./UmiProvider";
 import { useMobileWallet } from "../utils/useMobileWallet";
 import { Account, useAuthorization } from "./AuthorizationProvider";
+import { Platform } from "react-native";
 
 export interface NFTProviderProps {
   children: ReactNode;
@@ -35,75 +34,101 @@ const NFTContext = createContext<NFTContextState | null>(null);
 
 export function NFTProvider(props: NFTProviderProps) {
   const ipfsPrefix = `https://${process.env.EXPO_PUBLIC_NFT_PINATA_GATEWAY_URL}/ipfs/`;
-  const { connection } = useConnection();
-  const { authorizeSession, deauthorizeSession } = useAuthorization();
   const [account, setAccount] = useState<Account | null>(null);
   const [nftOfTheDay, setNftOfTheDay] = useState<DigitalAsset | null>(null);
   const [loadedNFTs, setLoadedNFTs] = useState<DigitalAsset[] | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const umi = useUmi();
   const { children } = props;
-
   const { connect } = useMobileWallet();
-  async function uploadBase64(base64String: string) {
+  
+  async function uploadImageFromURI(fileUri: string) {
     try {
-      const buffer = Buffer.from(base64String, "base64");
-      const blob = new Blob([buffer]);
-      const file = new File([blob], "file");
-      const data = new FormData();
-      data.append("file", file);
+      console.log("fileURI", fileUri)
+      const form = new FormData();
+      const randomFileName = `image_${Date.now()}_${Math.floor(Math.random() * 10000)}.jpg`;
 
-      const upload = await fetch(
-        "https://api.pinata.cloud/pinning/pinFileToIPFS",
-        {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${process.env.EXPO_PUBLIC_NFT_PINATA_JWT}`,
-          },
-          body: data,
+      // @ts-ignore
+      form.append("file", {
+        uri: Platform.OS === 'android' ? fileUri : fileUri.replace('file://', ''),
+        type: 'image/jpeg', // Adjust the type as necessary
+        name: randomFileName // Adjust the name as necessary
+      });
+  
+      const options = {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${process.env.EXPO_PUBLIC_NFT_PINATA_JWT}`, // Use the actual API key instead of the URL
+          'Content-Type': 'multipart/form-data'
         },
-      );
-      const uploadRes = await upload.json();
-      return uploadRes;
+        body: form
+      };
+  
+      const response = await fetch('https://api.pinata.cloud/pinning/pinFileToIPFS', options);
+      const responseJson = await response.json();
+      console.log(responseJson.IpfsHash)
+
+      return responseJson; 
     } catch (error) {
-      console.log(error);
+      console.error("Upload failed:", error);
+    } finally {
+      console.log("Upload process completed.");
     }
   }
+  
 
   async function uploadMetadataJson(
-    name: string,
-    description: string,
-    imageCID: string
+    name = "Pinnie",
+    description = "A really sweet NFT of Pinnie the Pinata",
+    imageCID = "bafkreih5aznjvttude6c3wbvqeebb6rlx5wkbzyppv7garjiubll2ceym4"
   ) {
+    const randomFileName = `metadata_${Date.now()}_${Math.floor(Math.random() * 10000)}.json`;
     const data = JSON.stringify({
       pinataContent: {
         name,
         description,
         imageCID,
       },
+      pinataMetadata: {
+        name: randomFileName
+      }
     });
-
     const res = await fetch("https://api.pinata.cloud/pinning/pinJSONToIPFS", {
       method: "POST",
       headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${process.env.EXPO_PUBLIC_NFT_PINATA_JWT}`,
+        "Content-Type": "application/x-www-form-urlencoded",
+        Accept: 'application/json',
+        Authorization: `Bearer ${process.env.EXPO_PUBLIC_NFT_PINATA_JWT}`   
       },
       body: data,
     });
-
     const resData = await res.json();
+    
     return resData;
   }
-
-
+  
+  // Connect wallet and set account
+  async function handleConnect() {
+    try {
+      const walletAccount = await connect();
+      if (walletAccount) {
+        setAccount(walletAccount); // Update account state with the connected wallet
+        console.log('Connected account:', walletAccount);
+      }
+    } catch (error) {
+      console.error("Failed to connect wallet:", error);
+    }
+  }
+  useEffect(() => {
+    handleConnect(); // Auto-connect when the component mounts (optional)
+  }, []);
 
   const fetchNFTs = useCallback(async () => {
     if (!umi || !account || isLoading) return;
     setIsLoading(true);
-
     try {
       const creatorPublicKey = fromWeb3JsPublicKey(account.publicKey);
+      console.log("Creator", creatorPublicKey)
       const nfts = await fetchAllDigitalAssetByCreator(umi, creatorPublicKey);
       setLoadedNFTs(nfts);
     } catch (error) {
@@ -114,8 +139,7 @@ export function NFTProvider(props: NFTProviderProps) {
   }, [umi, account, isLoading]);
 
   const uploadImage = useCallback(async (fileUri: string): Promise<string> => {
-    const imageBytesInBase64 = await RNFetchBlob.fs.readFile(fileUri, "base64");
-    const upload = await uploadBase64(imageBytesInBase64)
+    const upload = await uploadImageFromURI(fileUri)
     return upload.IpfsHash;
   }, []);
 
@@ -125,13 +149,6 @@ export function NFTProvider(props: NFTProviderProps) {
     description: string,
     imageCID: string,
   ): Promise<string> => {
-    const data = JSON.stringify({
-      pinataContent: {
-        name,
-        description,
-        imageCID,
-      },
-    })
     const uploadRes = await uploadMetadataJson(name, description, imageCID);
     return uploadRes.IpfsHash;
   }, []);
@@ -148,6 +165,7 @@ export function NFTProvider(props: NFTProviderProps) {
       console.log(`Creating NFT...`);
       const imageCID = await uploadImage(fileUri);
       const metadataCID = await uploadMetadata(name, description, imageCID);
+      console.log(metadataCID);
       const mint = generateSigner(umi);
       const transaction = createNft(umi, {
         mint,
@@ -155,7 +173,9 @@ export function NFTProvider(props: NFTProviderProps) {
         uri: ipfsPrefix + metadataCID,
         sellerFeeBasisPoints: percentAmount(0),
       });
+      
       await transaction.sendAndConfirm(umi);
+      console.log("Hello 999 anh em");
       const createdNft = await fetchDigitalAsset(umi, mint.publicKey);
       setNftOfTheDay(createdNft);
     } catch (error) {
